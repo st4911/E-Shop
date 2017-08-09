@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:p="http://www.springframework.org/schema/p"
+	xmlns:aop="http://www.springframework.org/schema/aop" xmlns:tx="http://www.springframework.org/schema/tx"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.1.xsd
+	http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-3.1.xsd
+	http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-3.1.xsd
+	http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-3.1.xsd
+	">
+	<context:annotation-config></context:annotation-config>
+	<context:component-scan base-package="com.etc">
+		<context:exclude-filter type="annotation"
+			expression="org.springframework.stereotype.Controller" />
+	</context:component-scan>
+	<!-- 读取jdbc配置文件 -->
+	<bean name="placeholder"
+		class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+		<property name="locations" value="classpath:jdbc.properties"></property>
+	</bean>
+	<!-- 配置数据源 -->
+	<bean id="dataSource" class="org.apache.commons.dbcp.BasicDataSource">
+		<property name="url" value="${url}">
+		</property>
+		<property name="username" value="${username}"></property>
+		<property name="password" value="${password}"></property>
+		<property name="driverClassName" value="${driverClassName}"></property>
+	</bean>
+	<!-- SPRING的事务管理器,原来AOP里面的代理类，它替被代理类实现事务的提交或者回滚的操作 -->
+	<bean id="transactionManager"
+		class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+		<property name="dataSource" ref="dataSource" />
+	</bean>
+
+	<!-- 配置通知 -->
+	<tx:advice id="txAdvice" transaction-manager="transactionManager">
+		<tx:attributes>
+			<tx:method name="get*" read-only="true"></tx:method>
+			<!-- 其他方法使用默认的事务设置 -->
+			<tx:method name="*"></tx:method>
+		</tx:attributes>
+	</tx:advice>
+	<aop:config>
+		<!-- 配置切入点 -->
+		<aop:pointcut expression="execution(* com.etc.service.*.*(..))"
+			id="pc" />
+		<!-- 配置切入点跟通知器的关联 -->
+		<aop:advisor advice-ref="txAdvice" pointcut-ref="pc" />
+	</aop:config>
+	<!-- SPRING JDBC的配置 -->
+	<bean name="jdbcTemplate" class="org.springframework.jdbc.core.JdbcTemplate">
+		<constructor-arg ref="dataSource"></constructor-arg>
+	</bean>
+
+	<!-- mybatis的配置 -->
+	<bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+		<property name="dataSource">
+			<ref bean="dataSource" />
+		</property>
+		<!-- <property name="mapperLocations" > <list> <value>com/etc/dao/Animal.hbm.xml</value> 
+			</list> </property> -->
+
+		<property name="mapperLocations" value="classpath:com/etc/dao/*.xml">
+		</property>
+	</bean>
+
+	<!-- 这种是一个个去配置的方式，在MapperFactoryBean这个类里面通过你配置mapperInterface，然后调用getObject()里面的代码 
+		public T getObject() throws Exception { return getSqlSession().getMapper(this.mapperInterface); 
+		} 那spring想出了一个可以不用一个个配置的方式，就是用扫描的机制去实现 -->
+	<!-- <bean id="animalMapper" class="org.mybatis.spring.mapper.MapperFactoryBean"> 
+		<property name="mapperInterface" value="com.etc.dao.AnimalMapper" /> <property 
+		name="sqlSessionFactory" ref="sqlSessionFactory" /> </bean> -->
+	<!-- spring跟mybatis的整合，扫描所有的dao下的接口，然后创建接口的实现类 -->
+	<bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+		<property name="basePackage" value="com.etc.dao"></property>
+		<!-- <property name="sqlSessionFactory" ref="sqlSessionFactory" /> -->
+		<property name="sqlSessionFactoryBeanName" value="sqlSessionFactory"></property>
+	</bean>
+
+
+</beans>
